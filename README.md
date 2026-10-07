@@ -1,15 +1,14 @@
-# 0ADJS Player — Vercel Fixed Build
+# Aiku Player
 
-Import this folder/repository into Vercel.
-Framework preset: Other.
-Build command: empty.
-Output directory: empty.
+Deploy the `Aiku-Player` folder to Vercel as a static/Other project.
 
-The player is served directly from `/`.
+## What this build does
+- Native HTML5 video playback
+- MP4/WebM and browser-supported codecs
+- HLS `.m3u8` through HLS.js
+- Automatic Range-aware `/api/proxy` fallback when a direct media URL fails
+- HLS requests can also be routed through the proxy
+- Seeking, buffering, volume, speed, fullscreen and PiP controls
 
-Use:
-https://YOUR-DOMAIN.vercel.app/?url=ENCODED_VIDEO_URL
-
-The source must be a browser-playable direct video URL. A source can fail if it blocks hotlinking/CORS, is not a direct media URL, or does not support byte-range requests.
-
-Vercel cannot force-cache video bytes hosted on another domain from a static page.
+## Important
+The proxy can solve many CORS/hotlink/Range problems, but it cannot turn a webpage URL into a video file or decode unsupported codecs. For reliable playback, use a direct media URL, preferably H.264/AAC MP4.

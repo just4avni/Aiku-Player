@@ -82,7 +82,7 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
 .meta{margin-top:18px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
 .meta h1{font-size:clamp(18px,3.4vw,24px);overflow-wrap:anywhere}
 .meta .acts{display:flex;gap:8px}
-.fail{margin-top:18px;padding:20px;border:1px solid var(--line-2);background:var(--red-deep);border-radius:16px;color:#ffb0b0;line-height:1.6;font-size:14px}
+.source-line{margin-top:10px;color:var(--dim);font-size:12px;word-break:break-all}.source-line code{color:#bbb}.fail{margin-top:18px;padding:20px;border:1px solid var(--line-2);background:var(--red-deep);border-radius:16px;color:#ffb0b0;line-height:1.6;font-size:14px}
 .fail b{display:block;color:#fff;margin-bottom:6px;font-family:var(--display);font-size:16px}
 .fail ul{margin:8px 0 0;padding-left:20px;color:#e59a9a}
 
@@ -137,6 +137,7 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
       </div>
     </div>
     <div id="fail" class="fail hidden"></div>
+    <div id="sourceLine" class="source-line hidden"></div>
     <div class="meta">
       <h1 id="title">Video</h1>
       <div class="acts">
@@ -160,7 +161,7 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
     mute:'<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="m17 9 5 6M22 9l-5 6"/></svg>'
   };
   const fmt = s => { if (!Number.isFinite(s) || s < 0) return '0:00'; s=Math.floor(s); const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60; return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0'); };
-  let toastTimer, hls=null, source='', key='', idleTimer, lastTap=0, tapTimer=null, dragging=false;
+  let toastTimer, hls=null, source='', key='', idleTimer, lastTap=0, tapTimer=null, dragging=false, proxyTried=false, hlsProxy=false;
 
   function toast(t){ const e=$('toast'); e.textContent=t; e.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>e.classList.remove('show'),2200); }
   function validUrl(raw){ try { const u=new URL(raw); return /^https?:$/.test(u.protocol)&&u.hostname.includes('.'); } catch { return false; } }
@@ -180,26 +181,52 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
   function setLoading(on){ P.classList.toggle('loading',on); }
   function fail(title,msg,details=true){
     setLoading(false); const f=$('fail'); f.classList.remove('hidden');
-    f.innerHTML='<b>'+escapeHtml(title)+'</b><div>'+escapeHtml(msg)+'</div>'+(details?'<ul><li>Use the direct media URL, not a webpage/player URL.</li><li>The server must allow browser playback (CORS/hotlink access).</li><li>For best compatibility use MP4 with H.264 video and AAC audio.</li><li>HLS requires a valid .m3u8 playlist and reachable segments.</li></ul>':'');
+    f.innerHTML='<b>'+escapeHtml(title)+'</b><div>'+escapeHtml(msg)+'</div><button class="btn ghost" style="margin-top:14px" onclick="window.__aikuRetry&&window.__aikuRetry()">Retry through proxy</button>'+(details?'<ul><li>Use a direct media URL, not a webpage URL.</li><li>This player automatically tried the Vercel streaming proxy too.</li><li>For best compatibility use MP4 with H.264 video and AAC audio.</li><li>HLS requires a valid .m3u8 playlist and reachable segments.</li></ul>':'');
   }
+  function proxyUrl(u){ return '/api/proxy?url='+encodeURIComponent(u); }
+  function showSource(){ const e=$('sourceLine'); if(!e)return; e.classList.remove('hidden'); e.innerHTML='Source: <code>'+escapeHtml(source)+'</code>'; }
+  window.__aikuRetry=()=>{ if(!tryProxy()) toast('Proxy retry already used'); };
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  function destroyHls(){ if(hls){ try{hls.destroy();}catch{} hls=null; } }
-  function loadHls(u){
-    if(window.Hls && Hls.isSupported()){ hls=new Hls({enableWorker:true,lowLatencyMode:false,backBufferLength:90}); hls.loadSource(u); hls.attachMedia(v);
+  function destroyHls(){ if(hls){ try{hls.destroy();}catch{} hls=null; } hlsProxy=false; }
+  function makeHls(u){
+    const useProxy = hlsProxy;
+    if(window.Hls && Hls.isSupported()){
+      const cfg={enableWorker:true,lowLatencyMode:false,backBufferLength:90};
+      if(useProxy){ cfg.xhrSetup=(xhr,url)=>{ xhr.open('GET','/api/proxy?url='+encodeURIComponent(url),true); }; }
+      hls=new Hls(cfg); hls.loadSource(u); hls.attachMedia(v);
       hls.on(Hls.Events.MANIFEST_PARSED,()=>setLoading(false));
-      hls.on(Hls.Events.ERROR,(_,d)=>{ if(d.fatal){ if(d.type===Hls.ErrorTypes.NETWORK_ERROR){ hls.startLoad(); } else if(d.type===Hls.ErrorTypes.MEDIA_ERROR){ hls.recoverMediaError(); } else fail('HLS playback failed',d.details||'The stream could not be decoded.'); }});
-      return;
+      hls.on(Hls.Events.ERROR,(_,d)=>{
+        if(!d.fatal)return;
+        if(!hlsProxy && !proxyTried){
+          proxyTried=true; hlsProxy=true; destroyHls(); toast('Direct HLS failed — trying streaming proxy'); setLoading(true); makeHls(source); return;
+        }
+        if(d.type===Hls.ErrorTypes.NETWORK_ERROR){ try{hls.startLoad();}catch{} }
+        else if(d.type===Hls.ErrorTypes.MEDIA_ERROR){ try{hls.recoverMediaError();}catch{} }
+        else fail('HLS playback failed',d.details||'The stream could not be loaded.');
+      });
+      return true;
     }
-    if(v.canPlayType('application/vnd.apple.mpegurl')) { v.src=u; return; }
-    fail('HLS is not supported','This browser cannot play HLS streams.');
+    if(v.canPlayType('application/vnd.apple.mpegurl')) { v.src=useProxy?proxyUrl(u):u; return true; }
+    return false;
   }
   function loadSource(u){
     destroyHls(); v.pause(); v.removeAttribute('src'); v.load(); setLoading(true); $('fail').classList.add('hidden');
-    source=u; key='aiku-pos:'+u;
-    if(/\.m3u8(?:$|[?#])/i.test(u)){ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js'; s.onload=()=>loadHls(u); s.onerror=()=>fail('Could not load HLS engine','Check your internet connection.'); document.head.appendChild(s); }
-    else { v.src=u; v.load(); }
+    source=u; key='aiku-pos:'+u; proxyTried=false; hlsProxy=false; showSource();
+    if(/\.m3u8(?:$|[?#])/i.test(u)){
+      const use=()=>{ if(!makeHls(u)) fail('HLS is not supported','This browser cannot play HLS streams.'); };
+      if(window.Hls) use(); else { const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js'; s.onload=use; s.onerror=()=>{ hlsProxy=true; const t=document.createElement('script'); t.src='https://unpkg.com/hls.js@1.6.13/dist/hls.min.js'; t.onload=use; t.onerror=()=>fail('Could not load HLS engine','Your network blocked the HLS playback library.'); document.head.appendChild(t); }; document.head.appendChild(s); }
+    } else { v.src=u; v.load(); }
   }
+  function tryProxy(){
+    if(proxyTried || !source)return false;
+    proxyTried=true; setLoading(true); toast('Trying streaming proxy…');
+    destroyHls();
+    if(/\.m3u8(?:$|[?#])/i.test(source)){ hlsProxy=true; if(!makeHls(source)) fail('HLS is not supported','This browser cannot play HLS streams.'); }
+    else { v.src=proxyUrl(source); v.load(); }
+    return true;
+  }
+
   function start(raw){
     const u=normalize(raw); $('view').classList.remove('hidden'); $('open').classList.add('hidden');
     if(!u)return fail('Invalid video URL','Enter a full http:// or https:// media URL.',false);
@@ -227,7 +254,12 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
   v.addEventListener('play',()=>{P.classList.add('playing');setIcons();wake();});
   v.addEventListener('pause',()=>{P.classList.remove('playing','idle');setIcons();});
   v.addEventListener('volumechange',()=>{$('vol').value=v.muted?0:v.volume;setIcons();});
-  v.addEventListener('error',()=>{const er=v.error;const code=er&&er.code;const msg=code===4?'The browser does not support this media format/codec, or the server returned an unsupported response.':code===2?'The network connection to the video failed.':'The video could not be loaded or decoded.';fail('Can’t play this video',msg);});
+  v.addEventListener('error',()=>{
+    const er=v.error; const code=er&&er.code;
+    if(!proxyTried && source && tryProxy()) return;
+    const msg=code===4?'Unsupported media response or codec.':code===2?'The network connection to the video failed.':'The video could not be loaded or decoded.';
+    fail('Can’t play this video',msg);
+  });
   v.addEventListener('ended',()=>{try{localStorage.removeItem(key);}catch{}P.classList.remove('playing');setIcons();});
   v.addEventListener('loadedmetadata',()=>{try{const t=Number(localStorage.getItem(key));if(t>5&&Number.isFinite(v.duration)&&t<v.duration-10){v.currentTime=t;toast('Resumed at '+fmt(t));}}catch{} paint();});
   setInterval(()=>{if(source&&!v.paused&&v.currentTime>5){try{localStorage.setItem(key,String(Math.floor(v.currentTime)));}catch{}}},3000);
