@@ -112,7 +112,7 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
       <button class="btn">Play</button>
     </form>
     <div id="openErr" class="err" role="alert"></div>
-    <div class="chips"><b>MP4</b><b>WebM</b><b>MKV*</b><b>MOV</b><b>HLS (.m3u8)</b><b>Google Drive</b><b>Dropbox</b></div>
+    <div class="chips"><b>MP4</b><b>WebM</b><b>HLS</b><b>Direct URLs</b><b>Google Drive*</b><b>Dropbox*</b></div>
     <p class="note">*MKV and some codecs only play if your browser supports them. The link must be a direct file link, not a web page.</p>
   </section>
 
@@ -149,163 +149,105 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
 <div id="toast" class="toast" role="status"></div>
 
 <script>
-const $=id=>document.getElementById(id);
-const v=$('v'),P=$('player');
-const ICO={
-  play:'<svg viewBox="0 0 24 24" class="fill-play"><path d="M7 4l13 8-13 8z"/></svg>',
-  pause:'<svg viewBox="0 0 24 24" class="fill-play"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
-  vol:'<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M18.500 6.500a8 8 0 0 1 0 11"/></svg>',
-  mute:'<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="m17 9 5 6M22 9l-5 6"/></svg>'
-};
-let tt;function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('show'),2000)}
-const fmt=s=>{if(!isFinite(s))return'0:00';s=Math.floor(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const v = $('v'), P = $('player');
+  const ICO = {
+    play:'<svg viewBox="0 0 24 24" class="fill-play"><path d="M7 4l13 8-13 8z"/></svg>',
+    pause:'<svg viewBox="0 0 24 24" class="fill-play"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
+    vol:'<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>',
+    mute:'<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="m17 9 5 6M22 9l-5 6"/></svg>'
+  };
+  const fmt = s => { if (!Number.isFinite(s) || s < 0) return '0:00'; s=Math.floor(s); const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60; return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0'); };
+  let toastTimer, hls=null, source='', key='', idleTimer, lastTap=0, tapTimer=null, dragging=false;
 
-/* ---------- source handling ---------- */
-function normalize(raw){
-  let u=raw.trim();
-  if(!u)return null;
-  if(!/^https?:\/\//i.test(u))u='https://'+u;
-  let x;try{x=new URL(u)}catch{return null}
-  if(!x.hostname.includes('.'))return null;
-  // Google Drive share link -> direct download link
-  if(/drive\.google\.com$/.test(x.hostname)){
-    const m=x.pathname.match(/\/file\/d\/([\w-]+)/)||x.pathname.match(/\/d\/([\w-]+)/);
-    const id=m?m[1]:x.searchParams.get('id');
-    if(id)return`https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t`;
+  function toast(t){ const e=$('toast'); e.textContent=t; e.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>e.classList.remove('show'),2200); }
+  function validUrl(raw){ try { const u=new URL(raw); return /^https?:$/.test(u.protocol)&&u.hostname.includes('.'); } catch { return false; } }
+  function normalize(raw){
+    let u=String(raw||'').trim(); if(!u)return null; if(!/^https?:\/\//i.test(u))u='https://'+u; if(!validUrl(u))return null;
+    const x=new URL(u);
+    if(/(^|\.)dropbox\.com$/i.test(x.hostname)){ x.searchParams.delete('dl'); x.searchParams.set('raw','1'); return x.toString(); }
+    if(/drive\.google\.com$/i.test(x.hostname)){
+      const m=x.pathname.match(/\/file\/d\/([^/]+)/i)||x.pathname.match(/\/d\/([^/]+)/i);
+      const id=m?m[1]:x.searchParams.get('id');
+      if(id)return 'https://drive.usercontent.google.com/download?id='+encodeURIComponent(id)+'&export=download&confirm=t';
+    }
+    return x.toString();
   }
-  // Dropbox share link -> raw file
-  if(/(^|\.)dropbox\.com$/.test(x.hostname)){x.searchParams.delete('dl');x.searchParams.set('raw','1');return x.toString()}
-  return x.toString();
-}
-const nameOf=u=>{try{const p=new URL(u).pathname.split('/').filter(Boolean).pop()||'Video';return decodeURIComponent(p)}catch{return'Video'}};
-
-/* ---------- boot ---------- */
-const qp=new URLSearchParams(location.search);
-const src=qp.get('url');
-if(src){start(src)}else{$('open').classList.remove('hidden');$('urlIn').focus()}
-
-$('openForm').addEventListener('submit',e=>{
-  e.preventDefault();
-  const u=normalize($('urlIn').value);
-  if(!u){$('openErr').textContent='Enter a valid link starting with http:// or https://';return}
-  location.search='?url='+encodeURIComponent($('urlIn').value.trim());
-});
-
-let KEY='';
-function start(raw){
-  const u=normalize(raw);
-  $('view').classList.remove('hidden');
-  if(!u){return fail('That link isn’t valid','Check the URL and try again.')}
-  KEY='pos:'+u;
-  $('title').textContent=nameOf(u);document.title=nameOf(u)+' – 0adjs player';
-  if(location.protocol==='https:'&&u.startsWith('http:')){
-    return fail('Blocked: insecure link','This page is HTTPS, so browsers block plain http:// video. Use the https:// version of the link if the host supports it.')
+  function fileName(u){ try { const p=new URL(u).pathname.split('/').filter(Boolean).pop(); return p?decodeURIComponent(p):'Video'; } catch { return 'Video'; } }
+  function setIcons(){ $('pp').innerHTML=v.paused?ICO.play:ICO.pause; $('mute').innerHTML=(v.muted||v.volume===0)?ICO.mute:ICO.vol; }
+  function setLoading(on){ P.classList.toggle('loading',on); }
+  function fail(title,msg,details=true){
+    setLoading(false); const f=$('fail'); f.classList.remove('hidden');
+    f.innerHTML='<b>'+escapeHtml(title)+'</b><div>'+escapeHtml(msg)+'</div>'+(details?'<ul><li>Use the direct media URL, not a webpage/player URL.</li><li>The server must allow browser playback (CORS/hotlink access).</li><li>For best compatibility use MP4 with H.264 video and AAC audio.</li><li>HLS requires a valid .m3u8 playlist and reachable segments.</li></ul>':'');
   }
-  if(/\.m3u8(\?|$)/i.test(u)&&!v.canPlayType('application/vnd.apple.mpegurl')){
-    const s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.8/hls.min.js';
-    s.onload=()=>{if(window.Hls&&Hls.isSupported()){const h=new Hls();h.loadSource(u);h.attachMedia(v);h.on(Hls.Events.ERROR,(_,d)=>{if(d.fatal)fail('Stream error','The HLS stream couldn’t be loaded.')})}else fail('Not supported','Your browser can’t play HLS streams.')};
-    s.onerror=()=>fail('Couldn’t load HLS support','Check your connection.');
-    document.head.appendChild(s);
-  }else v.src=u;
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function destroyHls(){ if(hls){ try{hls.destroy();}catch{} hls=null; } }
+  function loadHls(u){
+    if(window.Hls && Hls.isSupported()){ hls=new Hls({enableWorker:true,lowLatencyMode:false,backBufferLength:90}); hls.loadSource(u); hls.attachMedia(v);
+      hls.on(Hls.Events.MANIFEST_PARSED,()=>setLoading(false));
+      hls.on(Hls.Events.ERROR,(_,d)=>{ if(d.fatal){ if(d.type===Hls.ErrorTypes.NETWORK_ERROR){ hls.startLoad(); } else if(d.type===Hls.ErrorTypes.MEDIA_ERROR){ hls.recoverMediaError(); } else fail('HLS playback failed',d.details||'The stream could not be decoded.'); }});
+      return;
+    }
+    if(v.canPlayType('application/vnd.apple.mpegurl')) { v.src=u; return; }
+    fail('HLS is not supported','This browser cannot play HLS streams.');
+  }
+  function loadSource(u){
+    destroyHls(); v.pause(); v.removeAttribute('src'); v.load(); setLoading(true); $('fail').classList.add('hidden');
+    source=u; key='aiku-pos:'+u;
+    if(/\.m3u8(?:$|[?#])/i.test(u)){ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/hls.js@1.6.13/dist/hls.min.js'; s.onload=()=>loadHls(u); s.onerror=()=>fail('Could not load HLS engine','Check your internet connection.'); document.head.appendChild(s); }
+    else { v.src=u; v.load(); }
+  }
+  function start(raw){
+    const u=normalize(raw); $('view').classList.remove('hidden'); $('open').classList.add('hidden');
+    if(!u)return fail('Invalid video URL','Enter a full http:// or https:// media URL.',false);
+    if(location.protocol==='https:'&&u.startsWith('http:')) return fail('Blocked insecure video','This page is HTTPS, so the browser blocks an HTTP media URL.',false);
+    $('title').textContent=fileName(u); document.title=fileName(u)+' – Aiku Player'; loadSource(u); setIcons();
+  }
+
+  function toggle(){ if(v.paused){v.play().catch(()=>toast('Playback was blocked — tap Play again'));} else v.pause(); }
+  function seekBy(s){ if(Number.isFinite(v.duration))v.currentTime=Math.max(0,Math.min(v.duration,v.currentTime+s)); }
+  function wake(){ P.classList.remove('idle'); clearTimeout(idleTimer); if(!v.paused)idleTimer=setTimeout(()=>P.classList.add('idle'),2600); }
+  function flash(id){const e=$(id);e.classList.remove('show');void e.offsetWidth;e.classList.add('show');}
+
+  $('openForm').addEventListener('submit',e=>{e.preventDefault();const raw=$('urlIn').value.trim();if(!normalize(raw)){$('openErr').textContent='Enter a valid http:// or https:// URL.';return;}location.search='?url='+encodeURIComponent(raw);});
+  $('pp').onclick=toggle; $('back').onclick=()=>seekBy(-10); $('fwd').onclick=()=>seekBy(10);
+  $('mute').onclick=()=>{v.muted=!v.muted;setIcons();};
+  $('vol').oninput=e=>{v.volume=Number(e.target.value);v.muted=false;setIcons();};
+  const SPEEDS=[1,.75,1.25,1.5,1.75,2];let si=0;
+  $('speed').onclick=()=>{si=(si+1)%SPEEDS.length;v.playbackRate=SPEEDS[si];$('speed').textContent=SPEEDS[si]+'×';};
+  $('pip').onclick=async()=>{try{if(document.pictureInPictureElement)await document.exitPictureInPicture();else if(document.pictureInPictureEnabled)await v.requestPictureInPicture();else toast('Picture-in-picture is not available');}catch{toast('Picture-in-picture is not available');}};
+  $('fs').onclick=()=>{try{if(document.fullscreenElement){document.exitFullscreen();}else if(P.requestFullscreen){P.requestFullscreen();}else if(v.webkitEnterFullscreen){v.webkitEnterFullscreen();}}catch{toast('Fullscreen is not available');}};
+  $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);toast('Link copied');}catch{toast('Copy failed');}};
+
+  ['loadstart','waiting','stalled'].forEach(e=>v.addEventListener(e,()=>setLoading(true)));
+  ['loadeddata','canplay','playing'].forEach(e=>v.addEventListener(e,()=>setLoading(false)));
+  v.addEventListener('play',()=>{P.classList.add('playing');setIcons();wake();});
+  v.addEventListener('pause',()=>{P.classList.remove('playing','idle');setIcons();});
+  v.addEventListener('volumechange',()=>{$('vol').value=v.muted?0:v.volume;setIcons();});
+  v.addEventListener('error',()=>{const er=v.error;const code=er&&er.code;const msg=code===4?'The browser does not support this media format/codec, or the server returned an unsupported response.':code===2?'The network connection to the video failed.':'The video could not be loaded or decoded.';fail('Can’t play this video',msg);});
+  v.addEventListener('ended',()=>{try{localStorage.removeItem(key);}catch{}P.classList.remove('playing');setIcons();});
+  v.addEventListener('loadedmetadata',()=>{try{const t=Number(localStorage.getItem(key));if(t>5&&Number.isFinite(v.duration)&&t<v.duration-10){v.currentTime=t;toast('Resumed at '+fmt(t));}}catch{} paint();});
+  setInterval(()=>{if(source&&!v.paused&&v.currentTime>5){try{localStorage.setItem(key,String(Math.floor(v.currentTime)));}catch{}}},3000);
+
+  function paint(){const d=v.duration||0,t=v.currentTime||0,p=d?Math.max(0,Math.min(100,t/d*100)):0;$('fill').style.width=p+'%';$('knob').style.left=p+'%';$('time').textContent=fmt(t)+' / '+fmt(d);let e=0;try{for(let i=0;i<v.buffered.length;i++)if(v.buffered.start(i)<=t)e=Math.max(e,v.buffered.end(i));}catch{}$('buf').style.width=d?Math.min(100,e/d*100)+'%':'0%';}
+  ['timeupdate','progress','durationchange','loadedmetadata'].forEach(e=>v.addEventListener(e,paint));
+  const bar=$('bar');
+  const pos=e=>{const r=bar.getBoundingClientRect();return Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));};
+  function scrub(e){if(Number.isFinite(v.duration))v.currentTime=pos(e)*v.duration;}
+  bar.addEventListener('pointerdown',e=>{dragging=true;bar.classList.add('drag');bar.setPointerCapture(e.pointerId);scrub(e);});
+  bar.addEventListener('pointermove',e=>{const p=pos(e);$('tip').style.left=p*100+'%';$('tip').textContent=fmt(p*(v.duration||0));if(dragging)scrub(e);});
+  ['pointerup','pointercancel'].forEach(e=>bar.addEventListener(e,()=>{dragging=false;bar.classList.remove('drag');}));
+
+  P.addEventListener('click',e=>{if(e.target.closest('.controls'))return;const now=Date.now(),r=P.getBoundingClientRect(),x=(e.clientX-r.left)/r.width;if(now-lastTap<280){clearTimeout(tapTimer);lastTap=0;if(x<.33){seekBy(-10);flash('rl');}else if(x>.67){seekBy(10);flash('rr');}else $('fs').click();}else{lastTap=now;tapTimer=setTimeout(()=>{if(P.classList.contains('idle')&&!v.paused){wake();return;}toggle();},280);}});
+  ['pointermove','pointerdown','keydown'].forEach(e=>P.addEventListener(e,wake));
+  document.addEventListener('keydown',e=>{if(!$('view').classList.contains('hidden')&&e.target.tagName!=='INPUT'&&e.target.tagName!=='BUTTON'){switch(e.key.toLowerCase()){case ' ':case 'k':e.preventDefault();toggle();break;case 'arrowleft':e.preventDefault();seekBy(-5);break;case 'arrowright':e.preventDefault();seekBy(5);break;case 'j':seekBy(-10);break;case 'l':seekBy(10);break;case 'arrowup':e.preventDefault();v.volume=Math.min(1,v.volume+.1);break;case 'arrowdown':e.preventDefault();v.volume=Math.max(0,v.volume-.1);break;case 'm':v.muted=!v.muted;break;case 'f':$('fs').click();break;default:return;}wake();}});
+  if(!document.pictureInPictureEnabled)$('pip').classList.add('hidden');
   setIcons();
-}
-function fail(title,text){
-  const f=$('fail');f.classList.remove('hidden');
-  f.innerHTML=`<b>${title}</b>${text}${title.startsWith('Can’t play')?`<ul><li>The link must go straight to a video file, not a web page.</li><li>Some hosts block playback on other sites or have expired the link.</li><li>The file may use a format your browser can’t play (try MP4/H.264).</li><li>Google Drive: large files can show a virus-scan page and won’t stream.</li></ul>`:''}`;
-  P.classList.remove('loading');
-}
-v.addEventListener('error',()=>{const c=v.error&&v.error.code;fail('Can’t play this video',c===3||c===4?'The browser couldn’t load or decode this file.':'The video failed to load.')});
-
-/* ---------- controls ---------- */
-function setIcons(){$('pp').innerHTML=v.paused?ICO.play:ICO.pause;$('mute').innerHTML=(v.muted||v.volume===0)?ICO.mute:ICO.vol}
-function toggle(){v.paused?v.play().catch(()=>{}):v.pause()}
-function seekBy(s){v.currentTime=Math.max(0,Math.min(v.duration||1e9,v.currentTime+s))}
-$('pp').onclick=toggle;
-$('back').onclick=()=>seekBy(-10);$('fwd').onclick=()=>seekBy(10);
-$('mute').onclick=()=>{v.muted=!v.muted};
-$('vol').oninput=e=>{v.volume=+e.target.value;v.muted=false};
-v.addEventListener('volumechange',()=>{$('vol').value=v.muted?0:v.volume;setIcons()});
-const SPEEDS=[1,1.25,1.5,2,0.5,0.75];let si=0;
-$('speed').onclick=()=>{si=(si+1)%SPEEDS.length;v.playbackRate=SPEEDS[si];$('speed').textContent=SPEEDS[si]+'×'};
-$('pip').onclick=async()=>{try{document.pictureInPictureElement?await document.exitPictureInPicture():await v.requestPictureInPicture()}catch{toast('Picture in picture isn’t available')}};
-if(!document.pictureInPictureEnabled)$('pip').classList.add('hidden');
-$('fs').onclick=()=>{
-  if(document.fullscreenElement||document.webkitFullscreenElement){(document.exitFullscreen||document.webkitExitFullscreen).call(document)}
-  else if(P.requestFullscreen)P.requestFullscreen();
-  else if(v.webkitEnterFullscreen)v.webkitEnterFullscreen(); // iPhone
-};
-$('copy').onclick=async()=>{
-  const link=location.href;
-  try{await navigator.clipboard.writeText(link)}catch{const t=document.createElement('textarea');t.value=link;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove()}
-  toast('Link copied');
-};
-
-v.addEventListener('play',()=>{P.classList.add('playing');setIcons()});
-v.addEventListener('pause',()=>{P.classList.remove('playing');P.classList.remove('idle');setIcons()});
-v.addEventListener('waiting',()=>P.classList.add('loading'));
-['playing','canplay','loadeddata'].forEach(ev=>v.addEventListener(ev,()=>P.classList.remove('loading')));
-v.addEventListener('loadstart',()=>P.classList.add('loading'));
-
-/* progress */
-function paint(){
-  const d=v.duration||0,t=v.currentTime||0,pc=d?t/d*100:0;
-  $('fill').style.width=pc+'%';$('knob').style.left=pc+'%';
-  $('time').textContent=fmt(t)+' / '+fmt(d);
-  if(d&&v.buffered.length){let e=0;for(let i=0;i<v.buffered.length;i++)if(v.buffered.start(i)<=t)e=Math.max(e,v.buffered.end(i));$('buf').style.width=e/d*100+'%'}
-}
-['timeupdate','progress','durationchange','loadedmetadata'].forEach(ev=>v.addEventListener(ev,paint));
-const bar=$('bar');let dragging=false;
-const posAt=e=>{const r=bar.getBoundingClientRect();return Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))};
-bar.addEventListener('pointerdown',e=>{dragging=true;bar.classList.add('drag');bar.setPointerCapture(e.pointerId);scrub(e)});
-bar.addEventListener('pointermove',e=>{const p=posAt(e);$('tip').style.left=p*100+'%';$('tip').textContent=fmt(p*(v.duration||0));if(dragging)scrub(e)});
-bar.addEventListener('pointerup',()=>{dragging=false;bar.classList.remove('drag')});
-function scrub(e){if(v.duration)v.currentTime=posAt(e)*v.duration}
-
-/* resume position (stored only in this browser) */
-v.addEventListener('loadedmetadata',()=>{
-  try{const t=+localStorage.getItem(KEY);if(t>5&&t<v.duration-10){v.currentTime=t;toast('Resumed from '+fmt(t))}}catch{}
-});
-setInterval(()=>{if(!v.paused&&v.currentTime>5){try{localStorage.setItem(KEY,Math.floor(v.currentTime))}catch{}}},4000);
-v.addEventListener('ended',()=>{try{localStorage.removeItem(KEY)}catch{}});
-
-/* tap/click: 1 tap = play/pause (or reveal controls), 2 taps = skip or fullscreen */
-let lastTap=0,tapTimer;
-P.addEventListener('click',e=>{
-  if(e.target.closest('.controls'))return;
-  const now=Date.now(),r=P.getBoundingClientRect(),x=(e.clientX-r.left)/r.width;
-  if(now-lastTap<280){
-    clearTimeout(tapTimer);lastTap=0;
-    if(x<.33){seekBy(-10);flash('rl')}else if(x>.67){seekBy(10);flash('rr')}else $('fs').click();
-  }else{
-    lastTap=now;
-    tapTimer=setTimeout(()=>{if(P.classList.contains('idle')&&!v.paused){wake();return}toggle()},280);
-  }
-});
-function flash(id){const el=$(id);el.classList.remove('show');void el.offsetWidth;el.classList.add('show')}
-
-/* auto-hide controls */
-let idleT;
-function wake(){P.classList.remove('idle');clearTimeout(idleT);idleT=setTimeout(()=>{if(!v.paused)P.classList.add('idle')},2600)}
-['pointermove','pointerdown','keydown'].forEach(ev=>P.addEventListener(ev,wake));
-v.addEventListener('play',wake);
-
-/* keyboard */
-document.addEventListener('keydown',e=>{
-  if(!src||e.target.tagName==='INPUT'&&e.target.type!=='range')return;
-  const k=e.key.toLowerCase();
-  if(k===' '||k==='k'){e.preventDefault();toggle()}
-  else if(k==='arrowleft'){e.preventDefault();seekBy(-5)}
-  else if(k==='arrowright'){e.preventDefault();seekBy(5)}
-  else if(k==='j'){seekBy(-10)}else if(k==='l'){seekBy(10)}
-  else if(k==='arrowup'){e.preventDefault();v.volume=Math.min(1,v.volume+.1)}
-  else if(k==='arrowdown'){e.preventDefault();v.volume=Math.max(0,v.volume-.1)}
-  else if(k==='m'){v.muted=!v.muted}
-  else if(k==='f'){$('fs').click()}
-  else return;
-  wake();
-});
-setIcons();
+  const src=new URLSearchParams(location.search).get('url'); if(src)start(src); else $('open').classList.remove('hidden');
+})();
 </script>
 </body>
 </html>
