@@ -1,0 +1,8 @@
+{
+  "name": "0ADJS Player",
+  "short_name": "0ADJS",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#060606",
+  "theme_color": "#060606"
+}

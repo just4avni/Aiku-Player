@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#060606">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="/manifest.webmanifest">
+<title>Player – 0adjs shop</title>
+<style>
+:root{
+  --bg:#060606;--surface:#0e0e0e;--surface-2:#141414;--line:#232323;--line-2:#331414;
+  --text:#f4f4f2;--muted:#9a9a96;--dim:#666;--red:#f01818;--red-hot:#ff3030;--red-deep:#2a0808;--green:#2fd06b;
+  --display:'Arial Black','Helvetica Neue',Arial,sans-serif;
+  --body:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased}
+body{min-height:100vh;display:flex;flex-direction:column;background:radial-gradient(900px 420px at 50% -120px,#f0181818,transparent 70%),var(--bg)}
+:focus-visible{outline:2px solid var(--red-hot);outline-offset:3px;border-radius:8px}
+.hidden{display:none!important}
+svg{display:block;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+header{height:68px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 max(5%,env(safe-area-inset-left));border-bottom:1px solid var(--line)}
+.logo{font-family:var(--display);font-size:19px;letter-spacing:-.5px}.logo span{color:var(--red);margin-left:4px}
+main{flex:1;width:min(980px,92%);margin:0 auto;padding:32px 0 60px}
+h1{font-family:var(--display);letter-spacing:-.035em;margin:0}
+.sub{color:var(--muted);font-size:14px;margin:6px 0 0}
+
+.card{background:linear-gradient(160deg,var(--surface-2),var(--surface));border:1px solid var(--line);border-radius:20px;padding:26px;box-shadow:inset 0 1px #ffffff08,0 16px 48px #000a;position:relative;overflow:hidden}
+.card:before{content:"";position:absolute;inset:0 0 auto 0;height:2px;background:linear-gradient(90deg,var(--red),transparent 65%);opacity:.7}
+.open{max-width:620px;margin:6vh auto 0}
+.open h1{font-size:clamp(30px,6vw,44px);line-height:1;margin-bottom:8px}
+form{display:flex;gap:10px;margin-top:22px}
+input{flex:1;min-width:0;border:1px solid #2a2a2a;background:#080808;color:var(--text);border-radius:12px;padding:14px;font:inherit;outline:0;transition:border-color .15s,box-shadow .15s}
+input:focus{border-color:var(--red);box-shadow:0 0 0 3px #f0181822}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;padding:13px 20px;font:600 14px var(--body);cursor:pointer;background:var(--red);color:#fff;box-shadow:0 0 30px #f0181830;transition:background .15s,transform .1s}
+.btn:hover{background:var(--red-hot)}.btn:active{transform:scale(.97)}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);box-shadow:none}
+.btn.ghost:hover{background:var(--surface-2);color:var(--text)}
+.btn svg{width:18px;height:18px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chips b{font-weight:500;font-size:12px;color:var(--muted);border:1px solid var(--line);padding:4px 10px;border-radius:99px}
+.note{margin:18px 0 0;color:var(--dim);font-size:13px;line-height:1.6}
+.err{color:#ff7a7a;font-size:13px;min-height:18px;margin-top:12px}
+
+/* player */
+.player{position:relative;background:#000;border-radius:18px;overflow:hidden;border:1px solid var(--line);box-shadow:0 30px 80px #000c;aspect-ratio:16/9;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.player:fullscreen{border-radius:0;border:0;aspect-ratio:auto}
+video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
+.center{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.bigplay{width:76px;height:76px;border-radius:50%;background:rgba(240,24,24,.92);display:grid;place-items:center;box-shadow:0 0 50px #f0181866;transition:opacity .2s,transform .2s}
+.bigplay svg{width:32px;height:32px;fill:#fff;stroke:none;margin-left:4px}
+.player.playing .bigplay{opacity:0;transform:scale(1.3)}
+.spin{position:absolute;width:54px;height:54px;border-radius:50%;border:4px solid #ffffff22;border-top-color:var(--red-hot);animation:r .8s linear infinite;opacity:0;transition:opacity .15s}
+.player.loading .spin{opacity:1}
+@keyframes r{to{transform:rotate(360deg)}}
+.ripple{position:absolute;top:50%;transform:translateY(-50%);padding:14px 18px;border-radius:99px;background:#000a;font-weight:700;font-size:14px;opacity:0;pointer-events:none}
+.ripple.l{left:10%}.ripple.r{right:10%}.ripple.show{animation:rp .55s ease-out}
+@keyframes rp{0%{opacity:1}100%{opacity:0}}
+.controls{position:absolute;left:0;right:0;bottom:0;padding:34px 14px 10px;background:linear-gradient(transparent,#000d);transition:opacity .25s}
+.player.idle.playing .controls{opacity:0;pointer-events:none}
+.player.idle.playing{cursor:none}
+.bar{position:relative;height:22px;display:flex;align-items:center;cursor:pointer;touch-action:none}
+.track{position:relative;width:100%;height:4px;border-radius:9px;background:#ffffff2a;transition:height .12s}
+.bar:hover .track,.bar.drag .track{height:7px}
+.buf,.fill{position:absolute;left:0;top:0;bottom:0;border-radius:9px}
+.buf{background:#ffffff40}.fill{background:var(--red)}
+.knob{position:absolute;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#fff;box-shadow:0 0 10px #000;transform:scale(0);transition:transform .12s}
+.bar:hover .knob,.bar.drag .knob{transform:scale(1)}
+.tip{position:absolute;bottom:26px;transform:translateX(-50%);background:#000c;padding:3px 8px;border-radius:8px;font-size:12px;font-variant-numeric:tabular-nums;opacity:0;pointer-events:none}
+.bar:hover .tip,.bar.drag .tip{opacity:1}
+.row{display:flex;align-items:center;gap:4px}
+.row .sp{flex:1}
+.ib{background:none;border:0;color:#fff;width:42px;height:42px;display:grid;place-items:center;border-radius:12px;cursor:pointer;padding:0;opacity:.92}
+.ib:hover{background:#ffffff1c;opacity:1}
+.time{font-size:13px;font-variant-numeric:tabular-nums;color:#ddd;padding:0 8px;white-space:nowrap}
+.vol{width:0;opacity:0;transition:width .2s,opacity .2s;accent-color:var(--red);padding:0;height:4px;margin:0;border:0;background:none;box-shadow:none}
+.vgroup:hover .vol,.vol:focus{width:84px;opacity:1;margin-right:8px}
+.speed{font:700 13px var(--body);width:auto;padding:0 10px}
+.fill-play{fill:currentColor;stroke:none}
+
+.meta{margin-top:18px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.meta h1{font-size:clamp(18px,3.4vw,24px);overflow-wrap:anywhere}
+.meta .acts{display:flex;gap:8px}
+.fail{margin-top:18px;padding:20px;border:1px solid var(--line-2);background:var(--red-deep);border-radius:16px;color:#ffb0b0;line-height:1.6;font-size:14px}
+.fail b{display:block;color:#fff;margin-bottom:6px;font-family:var(--display);font-size:16px}
+.fail ul{margin:8px 0 0;padding-left:20px;color:#e59a9a}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translate(-50%,16px);background:#151515;border:1px solid #333;padding:11px 18px;border-radius:99px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:30}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:560px){
+  form{flex-direction:column}
+  .controls{padding:28px 6px 4px}
+  .ib{width:38px;height:38px}.time{padding:0 4px;font-size:12px}
+  .vgroup{display:none}
+  .bigplay{width:60px;height:60px}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <a class="logo" href="?" style="text-decoration:none;color:inherit">0ADJS<span>PLAYER</span></a>
+</header>
+
+<main>
+  <section id="open" class="card open hidden">
+    <h1>Play any video link</h1>
+    <p class="sub">Paste a direct video URL. Nothing is uploaded or stored.</p>
+    <form id="openForm">
+      <input id="urlIn" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://example.com/video.mp4" required>
+      <button class="btn">Play</button>
+    </form>
+    <div id="openErr" class="err" role="alert"></div>
+    <div class="chips"><b>MP4</b><b>WebM</b><b>MKV*</b><b>MOV</b><b>HLS (.m3u8)</b><b>Google Drive</b><b>Dropbox</b></div>
+    <p class="note">*MKV and some codecs only play if your browser supports them. The link must be a direct file link, not a web page.</p>
+  </section>
+
+  <section id="view" class="hidden">
+    <div id="player" class="player">
+      <video id="v" playsinline preload="metadata" referrerpolicy="no-referrer"></video>
+      <div class="center"><div class="spin"></div><div class="bigplay"><svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></svg></div></div>
+      <div id="rl" class="ripple l">−10s</div><div id="rr" class="ripple r">+10s</div>
+      <div class="controls" id="ctl">
+        <div class="bar" id="bar"><div class="track"><div class="buf" id="buf"></div><div class="fill" id="fill"></div><div class="knob" id="knob"></div></div><div class="tip" id="tip">0:00</div></div>
+        <div class="row">
+          <button class="ib" id="pp" aria-label="Play/Pause"></button>
+          <button class="ib" id="back" aria-label="Back 10 seconds"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M10 9v6M14 9h-2v3h2a1.500 1.500 0 0 1 0 3h-2" stroke-width="1.600"/></svg></button>
+          <button class="ib" id="fwd" aria-label="Forward 10 seconds"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/><path d="M10 9v6M14 9h-2v3h2a1.500 1.500 0 0 1 0 3h-2" stroke-width="1.600"/></svg></button>
+          <div class="vgroup row"><button class="ib" id="mute" aria-label="Mute"></button><input id="vol" class="vol" type="range" min="0" max="1" step="0.05" value="1" aria-label="Volume"></div>
+          <span class="time" id="time">0:00 / 0:00</span>
+          <span class="sp"></span>
+          <button class="ib speed" id="speed" aria-label="Playback speed">1×</button>
+          <button class="ib" id="pip" aria-label="Picture in picture"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="7" height="5" rx="1" fill="currentColor"/></svg></button>
+          <button class="ib" id="fs" aria-label="Fullscreen"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+        </div>
+      </div>
+    </div>
+    <div id="fail" class="fail hidden"></div>
+    <div class="meta">
+      <h1 id="title">Video</h1>
+      <div class="acts">
+        <button class="btn ghost" id="copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>Copy link</button>
+        <a class="btn ghost" href="?">Open another</a>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="toast" class="toast" role="status"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const v=$('v'),P=$('player');
+const ICO={
+  play:'<svg viewBox="0 0 24 24" class="fill-play"><path d="M7 4l13 8-13 8z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" class="fill-play"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
+  vol:'<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M18.500 6.500a8 8 0 0 1 0 11"/></svg>',
+  mute:'<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="m17 9 5 6M22 9l-5 6"/></svg>'
+};
+let tt;function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('show'),2000)}
+const fmt=s=>{if(!isFinite(s))return'0:00';s=Math.floor(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
+
+/* ---------- source handling ---------- */
+function normalize(raw){
+  let u=raw.trim();
+  if(!u)return null;
+  if(!/^https?:\/\//i.test(u))u='https://'+u;
+  let x;try{x=new URL(u)}catch{return null}
+  if(!x.hostname.includes('.'))return null;
+  // Google Drive share link -> direct download link
+  if(/drive\.google\.com$/.test(x.hostname)){
+    const m=x.pathname.match(/\/file\/d\/([\w-]+)/)||x.pathname.match(/\/d\/([\w-]+)/);
+    const id=m?m[1]:x.searchParams.get('id');
+    if(id)return`https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t`;
+  }
+  // Dropbox share link -> raw file
+  if(/(^|\.)dropbox\.com$/.test(x.hostname)){x.searchParams.delete('dl');x.searchParams.set('raw','1');return x.toString()}
+  return x.toString();
+}
+const nameOf=u=>{try{const p=new URL(u).pathname.split('/').filter(Boolean).pop()||'Video';return decodeURIComponent(p)}catch{return'Video'}};
+
+/* ---------- boot ---------- */
+const qp=new URLSearchParams(location.search);
+const src=qp.get('url');
+if(src){start(src)}else{$('open').classList.remove('hidden');$('urlIn').focus()}
+
+$('openForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const u=normalize($('urlIn').value);
+  if(!u){$('openErr').textContent='Enter a valid link starting with http:// or https://';return}
+  location.search='?url='+encodeURIComponent($('urlIn').value.trim());
+});
+
+let KEY='';
+function start(raw){
+  const u=normalize(raw);
+  $('view').classList.remove('hidden');
+  if(!u){return fail('That link isn’t valid','Check the URL and try again.')}
+  KEY='pos:'+u;
+  $('title').textContent=nameOf(u);document.title=nameOf(u)+' – 0adjs player';
+  if(location.protocol==='https:'&&u.startsWith('http:')){
+    return fail('Blocked: insecure link','This page is HTTPS, so browsers block plain http:// video. Use the https:// version of the link if the host supports it.')
+  }
+  if(/\.m3u8(\?|$)/i.test(u)&&!v.canPlayType('application/vnd.apple.mpegurl')){
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.8/hls.min.js';
+    s.onload=()=>{if(window.Hls&&Hls.isSupported()){const h=new Hls();h.loadSource(u);h.attachMedia(v);h.on(Hls.Events.ERROR,(_,d)=>{if(d.fatal)fail('Stream error','The HLS stream couldn’t be loaded.')})}else fail('Not supported','Your browser can’t play HLS streams.')};
+    s.onerror=()=>fail('Couldn’t load HLS support','Check your connection.');
+    document.head.appendChild(s);
+  }else v.src=u;
+  setIcons();
+}
+function fail(title,text){
+  const f=$('fail');f.classList.remove('hidden');
+  f.innerHTML=`<b>${title}</b>${text}${title.startsWith('Can’t play')?`<ul><li>The link must go straight to a video file, not a web page.</li><li>Some hosts block playback on other sites or have expired the link.</li><li>The file may use a format your browser can’t play (try MP4/H.264).</li><li>Google Drive: large files can show a virus-scan page and won’t stream.</li></ul>`:''}`;
+  P.classList.remove('loading');
+}
+v.addEventListener('error',()=>{const c=v.error&&v.error.code;fail('Can’t play this video',c===3||c===4?'The browser couldn’t load or decode this file.':'The video failed to load.')});
+
+/* ---------- controls ---------- */
+function setIcons(){$('pp').innerHTML=v.paused?ICO.play:ICO.pause;$('mute').innerHTML=(v.muted||v.volume===0)?ICO.mute:ICO.vol}
+function toggle(){v.paused?v.play().catch(()=>{}):v.pause()}
+function seekBy(s){v.currentTime=Math.max(0,Math.min(v.duration||1e9,v.currentTime+s))}
+$('pp').onclick=toggle;
+$('back').onclick=()=>seekBy(-10);$('fwd').onclick=()=>seekBy(10);
+$('mute').onclick=()=>{v.muted=!v.muted};
+$('vol').oninput=e=>{v.volume=+e.target.value;v.muted=false};
+v.addEventListener('volumechange',()=>{$('vol').value=v.muted?0:v.volume;setIcons()});
+const SPEEDS=[1,1.25,1.5,2,0.5,0.75];let si=0;
+$('speed').onclick=()=>{si=(si+1)%SPEEDS.length;v.playbackRate=SPEEDS[si];$('speed').textContent=SPEEDS[si]+'×'};
+$('pip').onclick=async()=>{try{document.pictureInPictureElement?await document.exitPictureInPicture():await v.requestPictureInPicture()}catch{toast('Picture in picture isn’t available')}};
+if(!document.pictureInPictureEnabled)$('pip').classList.add('hidden');
+$('fs').onclick=()=>{
+  if(document.fullscreenElement||document.webkitFullscreenElement){(document.exitFullscreen||document.webkitExitFullscreen).call(document)}
+  else if(P.requestFullscreen)P.requestFullscreen();
+  else if(v.webkitEnterFullscreen)v.webkitEnterFullscreen(); // iPhone
+};
+$('copy').onclick=async()=>{
+  const link=location.href;
+  try{await navigator.clipboard.writeText(link)}catch{const t=document.createElement('textarea');t.value=link;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove()}
+  toast('Link copied');
+};
+
+v.addEventListener('play',()=>{P.classList.add('playing');setIcons()});
+v.addEventListener('pause',()=>{P.classList.remove('playing');P.classList.remove('idle');setIcons()});
+v.addEventListener('waiting',()=>P.classList.add('loading'));
+['playing','canplay','loadeddata'].forEach(ev=>v.addEventListener(ev,()=>P.classList.remove('loading')));
+v.addEventListener('loadstart',()=>P.classList.add('loading'));
+
+/* progress */
+function paint(){
+  const d=v.duration||0,t=v.currentTime||0,pc=d?t/d*100:0;
+  $('fill').style.width=pc+'%';$('knob').style.left=pc+'%';
+  $('time').textContent=fmt(t)+' / '+fmt(d);
+  if(d&&v.buffered.length){let e=0;for(let i=0;i<v.buffered.length;i++)if(v.buffered.start(i)<=t)e=Math.max(e,v.buffered.end(i));$('buf').style.width=e/d*100+'%'}
+}
+['timeupdate','progress','durationchange','loadedmetadata'].forEach(ev=>v.addEventListener(ev,paint));
+const bar=$('bar');let dragging=false;
+const posAt=e=>{const r=bar.getBoundingClientRect();return Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))};
+bar.addEventListener('pointerdown',e=>{dragging=true;bar.classList.add('drag');bar.setPointerCapture(e.pointerId);scrub(e)});
+bar.addEventListener('pointermove',e=>{const p=posAt(e);$('tip').style.left=p*100+'%';$('tip').textContent=fmt(p*(v.duration||0));if(dragging)scrub(e)});
+bar.addEventListener('pointerup',()=>{dragging=false;bar.classList.remove('drag')});
+function scrub(e){if(v.duration)v.currentTime=posAt(e)*v.duration}
+
+/* resume position (stored only in this browser) */
+v.addEventListener('loadedmetadata',()=>{
+  try{const t=+localStorage.getItem(KEY);if(t>5&&t<v.duration-10){v.currentTime=t;toast('Resumed from '+fmt(t))}}catch{}
+});
+setInterval(()=>{if(!v.paused&&v.currentTime>5){try{localStorage.setItem(KEY,Math.floor(v.currentTime))}catch{}}},4000);
+v.addEventListener('ended',()=>{try{localStorage.removeItem(KEY)}catch{}});
+
+/* tap/click: 1 tap = play/pause (or reveal controls), 2 taps = skip or fullscreen */
+let lastTap=0,tapTimer;
+P.addEventListener('click',e=>{
+  if(e.target.closest('.controls'))return;
+  const now=Date.now(),r=P.getBoundingClientRect(),x=(e.clientX-r.left)/r.width;
+  if(now-lastTap<280){
+    clearTimeout(tapTimer);lastTap=0;
+    if(x<.33){seekBy(-10);flash('rl')}else if(x>.67){seekBy(10);flash('rr')}else $('fs').click();
+  }else{
+    lastTap=now;
+    tapTimer=setTimeout(()=>{if(P.classList.contains('idle')&&!v.paused){wake();return}toggle()},280);
+  }
+});
+function flash(id){const el=$(id);el.classList.remove('show');void el.offsetWidth;el.classList.add('show')}
+
+/* auto-hide controls */
+let idleT;
+function wake(){P.classList.remove('idle');clearTimeout(idleT);idleT=setTimeout(()=>{if(!v.paused)P.classList.add('idle')},2600)}
+['pointermove','pointerdown','keydown'].forEach(ev=>P.addEventListener(ev,wake));
+v.addEventListener('play',wake);
+
+/* keyboard */
+document.addEventListener('keydown',e=>{
+  if(!src||e.target.tagName==='INPUT'&&e.target.type!=='range')return;
+  const k=e.key.toLowerCase();
+  if(k===' '||k==='k'){e.preventDefault();toggle()}
+  else if(k==='arrowleft'){e.preventDefault();seekBy(-5)}
+  else if(k==='arrowright'){e.preventDefault();seekBy(5)}
+  else if(k==='j'){seekBy(-10)}else if(k==='l'){seekBy(10)}
+  else if(k==='arrowup'){e.preventDefault();v.volume=Math.min(1,v.volume+.1)}
+  else if(k==='arrowdown'){e.preventDefault();v.volume=Math.max(0,v.volume-.1)}
+  else if(k==='m'){v.muted=!v.muted}
+  else if(k==='f'){$('fs').click()}
+  else return;
+  wake();
+});
+setIcons();
+</script>
+</body>
+</html>
