@@ -1,14 +1,24 @@
-# Aiku Player
+# Aiku Player v4
 
-Deploy the `Aiku-Player` folder to Vercel as a static/Other project.
+Netflix-style browser video player for direct media URLs.
 
-## What this build does
-- Native HTML5 video playback
-- MP4/WebM and browser-supported codecs
-- HLS `.m3u8` through HLS.js
-- Automatic Range-aware `/api/proxy` fallback when a direct media URL fails
-- HLS requests can also be routed through the proxy
-- Seeking, buffering, volume, speed, fullscreen and PiP controls
+## Features
+- MP4/WebM/native browser playback
+- HLS `.m3u8` via hls.js with quality and alternate audio tracks
+- Vercel streaming proxy fallback with Range requests
+- Play/pause, seek, 10s skip, volume, speed, fullscreen, PiP
+- Fit / Fill / 100–300% zoom, pinch zoom and pan
+- Subtitle/caption menu: HLS subtitle tracks, remote WebVTT URL, local `.vtt` file
+- Audio/language selector for HLS alternate audio tracks
+- Chapters menu when a chapters text track is supplied
+- Cinema mode, screen lock, resume position, keyboard shortcuts
+- Mobile double-tap seeking and center fullscreen gesture
 
-## Important
-The proxy can solve many CORS/hotlink/Range problems, but it cannot turn a webpage URL into a video file or decode unsupported codecs. For reliable playback, use a direct media URL, preferably H.264/AAC MP4.
+## Deploy
+Deploy the `Aiku-Player` directory to Vercel as a static site. The `/api/proxy` function is used automatically when a direct media request fails.
+
+## Subtitle URL
+You can preload a WebVTT subtitle with:
+`?url=VIDEO_URL&sub=SUBTITLE_VTT_URL&subLabel=English`
+
+Remote subtitle files must allow browser access (CORS), or the browser will block them.
