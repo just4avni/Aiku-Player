@@ -94,6 +94,7 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
 .meta h1{font-size:clamp(18px,3.4vw,24px);overflow-wrap:anywhere}
 .meta .acts{display:flex;gap:8px}
 .source-line{margin-top:10px;color:var(--dim);font-size:12px;word-break:break-all}.source-line code{color:#bbb}.fail{margin-top:18px;padding:20px;border:1px solid var(--line-2);background:var(--red-deep);border-radius:16px;color:#ffb0b0;line-height:1.6;font-size:14px}
+.transcode-box{margin-top:14px;padding:14px;border:1px solid #303030;background:#101010;border-radius:14px;color:#ddd}.transcode-box b{display:block;color:#fff;margin-bottom:4px}.transcode-progress{height:6px;border-radius:9px;background:#292929;overflow:hidden;margin:10px 0 7px}.transcode-progress i{display:block;height:100%;width:0;background:var(--red);transition:width .15s}.transcode-status{font-size:12px;color:#999;min-height:18px}
 .fail b{display:block;color:#fff;margin-bottom:6px;font-family:var(--display);font-size:16px}
 .fail ul{margin:8px 0 0;padding-left:20px;color:#e59a9a}
 
@@ -206,6 +207,8 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
 </main>
 <div id="toast" class="toast" role="status"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/umd/index.js"></script>
 <script>
 (() => {
   'use strict';
@@ -218,6 +221,7 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
     mute:'<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="m17 9 5 6M22 9l-5 6"/></svg>'
   };
   const fmt = s => { if (!Number.isFinite(s) || s < 0) return '0:00'; s=Math.floor(s); const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60; return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0'); };
+  let ffmpeg=null, ffmpegLoaded=false, converting=false;
   let toastTimer, hls=null, source='', key='', idleTimer, lastTap=0, tapTimer=null, dragging=false, proxyTried=false, hlsProxy=false, zoom=1, fitMode='fit', panX=0, panY=0, panStart=null, pinchStart=null, pinchZoomStart=1, suppressClick=false, qualityLevels=[], subtitleTracks=[], activeSubtitle=-1, audioTracks=[], locked=false, chapterCues=[];
 
   function toast(t){ const e=$('toast'); e.textContent=t; e.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>e.classList.remove('show'),2200); }
@@ -236,10 +240,67 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
   function fileName(u){ try { const p=new URL(u).pathname.split('/').filter(Boolean).pop(); return p?decodeURIComponent(p):'Video'; } catch { return 'Video'; } }
   function setIcons(){ $('pp').innerHTML=v.paused?ICO.play:ICO.pause; $('mute').innerHTML=(v.muted||v.volume===0)?ICO.mute:ICO.vol; }
   function setLoading(on){ P.classList.toggle('loading',on); }
+  function canTranscodeSource(u){
+    return /\.(mkv|mk3d|avi|flv|wmv|asf|ts|mts|m2ts|m2v|mpg|mpeg|mpe|vob|3gp|3g2|ogv)(?:$|[?#])/i.test(u||'');
+  }
   function fail(title,msg,details=true){
     setLoading(false); const f=$('fail'); f.classList.remove('hidden');
-    f.innerHTML='<b>'+escapeHtml(title)+'</b><div>'+escapeHtml(msg)+'</div><button class="btn ghost" style="margin-top:14px" onclick="window.__aikuRetry&&window.__aikuRetry()">Retry through proxy</button>'+(details?'<ul><li>Use a direct media URL, not a webpage URL.</li><li>This player automatically tried the Vercel streaming proxy too.</li><li>For best compatibility use MP4 with H.264 video and AAC audio.</li><li>HLS requires a valid .m3u8 playlist and reachable segments.</li></ul>':'');
+    const convert=canTranscodeSource(source)?'<div class="transcode-box"><b>Browser compatibility mode</b><div>This container/codec is not reliably decoded by mobile browsers. A local FFmpeg engine can convert it to a browser-playable MP4.</div><button class="btn" style="margin-top:11px" onclick="window.__aikuTranscode&&window.__aikuTranscode()">Convert & Play</button><div class="transcode-progress"><i id="transcodeBar"></i></div><div class="transcode-status" id="transcodeStatus"></div></div>':'';
+    f.innerHTML='<b>'+escapeHtml(title)+'</b><div>'+escapeHtml(msg)+'</div><button class="btn ghost" style="margin-top:14px" onclick="window.__aikuRetry&&window.__aikuRetry()">Retry through proxy</button><button class="btn ghost" style="margin-top:10px" onclick="window.__aikuConvert&&window.__aikuConvert()">Convert unsupported format</button>'+convert+(details?'<ul><li>Use a direct media URL, not a webpage URL.</li><li>This player automatically tried the Vercel streaming proxy too.</li><li>For best compatibility use MP4 with H.264 video and AAC audio.</li><li>MKV/AVI/FLV/etc. use the optional browser FFmpeg compatibility mode.</li><li>HLS requires a valid .m3u8 playlist and reachable segments.</li></ul>':'');
   }
+  let ffmpegInstance=null, ffmpegLoading=null, ffmpegObjectUrl=null;
+  async function getFFmpeg(){
+    if(ffmpegInstance) return ffmpegInstance;
+    if(ffmpegLoading) return ffmpegLoading;
+    ffmpegLoading=(async()=>{
+      const [{FFmpeg},{fetchFile,toBlobURL}]=await Promise.all([
+        import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js'),
+        import('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js')
+      ]);
+      const f=new FFmpeg();
+      const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd';
+      await f.load({
+        coreURL:await toBlobURL(base+'/ffmpeg-core.js','text/javascript'),
+        wasmURL:await toBlobURL(base+'/ffmpeg-core.wasm','application/wasm')
+      });
+      ffmpegInstance={f,fetchFile};
+      return ffmpegInstance;
+    })();
+    try{return await ffmpegLoading;}finally{ffmpegLoading=null;}
+  }
+  function setTranscodeUI(progress,status){
+    const b=$('transcodeBar'), s=$('transcodeStatus');
+    if(b)b.style.width=Math.max(0,Math.min(100,progress*100))+'%';
+    if(s)s.textContent=status||'';
+  }
+  async function transcodeAndPlay(){
+    if(!source)return;
+    try{
+      setLoading(true); setTranscodeUI(0,'Loading browser video engine (~31 MB)…');
+      const {f,fetchFile}=await getFFmpeg();
+      f.on('progress',({progress})=>setTranscodeUI(progress,'Converting video… '+Math.round(progress*100)+'%'));
+      const inputExt=(source.match(/\.([a-z0-9]+)(?:$|[?#])/i)?.[1]||'mkv').toLowerCase();
+      const input='input.'+inputExt, output='output.mp4';
+      setTranscodeUI(0,'Downloading source…');
+      const data=await fetchFile(proxyUrl(source));
+      await f.writeFile(input,data);
+      setTranscodeUI(.01,'Converting…');
+      try{
+        await f.exec(['-i',input,'-c','copy','-movflags','+faststart',output]);
+      }catch{
+        await f.exec(['-i',input,'-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-b:a','128k','-movflags','+faststart',output]);
+      }
+      const out=await f.readFile(output);
+      if(ffmpegObjectUrl)URL.revokeObjectURL(ffmpegObjectUrl);
+      ffmpegObjectUrl=URL.createObjectURL(new Blob([out.buffer],{type:'video/mp4'}));
+      v.src=ffmpegObjectUrl; v.load(); $('fail').classList.add('hidden'); setLoading(false); setTranscodeUI(1,'Ready'); toast('Converted and ready to play');
+      try{await v.play();}catch{}
+      try{await f.deleteFile(input);}catch{} try{await f.deleteFile(output);}catch{}
+    }catch(e){
+      setLoading(false); setTranscodeUI(0,'Conversion failed: '+(e?.message||'unknown error')); toast('Could not convert this video');
+    }
+  }
+  window.__aikuTranscode=transcodeAndPlay;
   function proxyUrl(u){ return '/api/proxy?url='+encodeURIComponent(u); }
   function showSource(){ const e=$('sourceLine'); if(!e)return; e.classList.remove('hidden'); e.innerHTML='Source: <code>'+escapeHtml(source)+'</code>'; }
   window.__aikuRetry=()=>{ if(!tryProxy()) toast('Proxy retry already used'); };
@@ -296,6 +357,46 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
   function renderNativeCue(tt){if(activeSubtitle<0||tt.mode!=='showing'){if(activeSubtitle<0)$('subtitleBadge').textContent='';return;}const cues=tt.activeCues;if(!cues||!cues.length){$('subtitleBadge').textContent='';return;}$('subtitleBadge').textContent=Array.from(cues).map(c=>c.text.replace(/<[^>]+>/g,'')).join(' ');}
   function refreshChapters(){const box=$('chaptersList');box.innerHTML='';chapterCues=[];for(const tt of Array.from(v.textTracks)){if(tt.kind==='chapters'){chapterCues=Array.from(tt.cues||[]);break;}}if(!chapterCues.length){$('chaptersNote').textContent='No chapter track detected.';return;}$('chaptersNote').textContent='';chapterCues.forEach((c,i)=>{const b=document.createElement('button');b.className='menu-choice';b.textContent=c.text||('Chapter '+(i+1));b.onclick=()=>{v.currentTime=c.start;v.play().catch(()=>{});closePanels();};box.appendChild(b);});}
   function togglePanel(id){const hidden=$(id).classList.contains('hidden');closePanels(hidden?id:null);$(id).classList.toggle('hidden',!hidden);wake();}
+
+  const UNSUPPORTED_EXT=/\.(mkv|mkb|avi|flv|wmv|mpeg|mpg|mts|m2ts|ts|vob|3gp|ogv|ogm|divx|rm|rmvb)(?:$|[?#])/i;
+  function likelyUnsupported(u){ return UNSUPPORTED_EXT.test(u) || /video\/(x-matroska|x-msvideo|x-flv|x-ms-wmv)/i.test(v.getAttribute('type')||''); }
+  async function ensureFFmpeg(){
+    if(ffmpegLoaded) return ffmpeg;
+    if(!window.FFmpegWASM || !window.FFmpegUtil) throw new Error('FFmpeg engine could not be loaded');
+    const {FFmpeg}=window.FFmpegWASM;
+    const {toBlobURL}=window.FFmpegUtil;
+    ffmpeg=new FFmpeg();
+    ffmpeg.on('progress',({progress})=>{ $('convertProgress').textContent=Math.round(progress*100)+'%'; });
+    ffmpeg.on('log',({message})=>{ if(/error/i.test(message)) $('convertProgress').textContent=message.slice(0,90); });
+    const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd';
+    await ffmpeg.load({coreURL:await toBlobURL(base+'/ffmpeg-core.js','text/javascript'),wasmURL:await toBlobURL(base+'/ffmpeg-core.wasm','application/wasm')});
+    ffmpegLoaded=true; return ffmpeg;
+  }
+  function inputExt(u){ try{const x=new URL(u); const m=x.pathname.match(/\.([a-z0-9]+)$/i); return m?m[1].toLowerCase():'mkv';}catch{return 'mkv';} }
+  async function convertUnsupported(){
+    if(converting)return;
+    converting=true; setLoading(true); const failBox=$('fail');
+    failBox.classList.remove('hidden'); failBox.innerHTML='<b>Converting video…</b><div id="convertProgress">Loading converter…</div><div class="panel-note">Unsupported containers/codecs are converted locally in your browser to H.264/AAC MP4. Large files may use a lot of RAM.</div>';
+    try{
+      const engine=await ensureFFmpeg();
+      const response=await fetch(proxyUrl(source),{headers:{Accept:'video/*,*/*'}});
+      if(!response.ok) throw new Error('Could not download the source through the player proxy ('+response.status+').');
+      const data=new Uint8Array(await response.arrayBuffer());
+      if(data.byteLength>1200*1024*1024) throw new Error('This file is over 1.2 GB; browser conversion is not practical.');
+      const ext=inputExt(source), input='input.'+ext, output='aiku-output.mp4';
+      await engine.writeFile(input,data);
+      $('convertProgress').textContent='0% — transcoding…';
+      await engine.exec(['-i',input,'-map','0:v:0?','-map','0:a:0?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-b:a','128k','-movflags','+faststart',output]);
+      const out=await engine.readFile(output);
+      const blob=new Blob([out.buffer],{type:'video/mp4'});
+      const url=URL.createObjectURL(blob);
+      destroyHls(); v.pause(); v.removeAttribute('src'); v.src=url; v.load(); source=url; key='aiku-converted:'+Date.now();
+      failBox.classList.add('hidden'); toast('Converted to MP4 — playback ready');
+      try{await engine.deleteFile(input);await engine.deleteFile(output);}catch{}
+    }catch(e){ failBox.classList.remove('hidden'); failBox.innerHTML='<b>Conversion failed</b><div>'+escapeHtml(e?.message||String(e))+'</div><div class="panel-note">MKV/AVI support depends on the codecs inside the file. For very large files, use a server-side FFmpeg conversion instead.</div>'; }
+    finally{converting=false;setLoading(false);}
+  }
+  window.__aikuConvert=convertUnsupported;
 
   function loadSource(u){
     destroyHls(); v.pause(); v.removeAttribute('src'); v.load(); setLoading(true); $('fail').classList.add('hidden');
