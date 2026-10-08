@@ -4,7 +4,16 @@
   const KEY='aiku.stream.v3';
   const defaults={library:[],history:[],continue:[],repos:[],providers:[],settings:{autoplay:true,bridgeUrl:'',searchParallel:true}};
   let db=load(), page='home', searchResults=[];
-  function load(){try{return deep({...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')})}catch{return deep(defaults)}}
+  function load(){try{
+    const raw=JSON.parse(localStorage.getItem(KEY)||'{}')||{};
+    const out={...defaults,...raw,settings:{...defaults.settings,...(raw.settings||{})}};
+    out.library=Array.isArray(out.library)?out.library:[];
+    out.history=Array.isArray(out.history)?out.history:[];
+    out.continue=Array.isArray(out.continue)?out.continue:[];
+    out.repos=Array.isArray(out.repos)?out.repos:[];
+    out.providers=Array.isArray(out.providers)?out.providers:[];
+    return deep(out);
+  }catch{return deep(defaults)}}
   function deep(x){return JSON.parse(JSON.stringify(x))}
   function save(){localStorage.setItem(KEY,JSON.stringify(db))}
   function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -35,10 +44,34 @@
   function repoCard(r,i){return `<div class="repo-card"><div class="repo-head">${r.iconUrl?`<img src="${esc(r.iconUrl)}">`:''}<div class="grow"><b>${esc(r.name||r.url)}</b><small>${esc(r.description||'')}</small><small>${r.plugins?.length||0} providers · ${r.refreshed?new Date(r.refreshed).toLocaleString():'not refreshed'}</small></div></div><small class="mono">${esc(r.url)}</small><div class="repo-actions"><button class="btn" data-refresh-repo="${i}">Refresh</button><button class="btn ghost" data-install-all="${i}">Enable all</button><button class="btn ghost danger" data-remove-repo="${i}">Remove</button></div></div>`}
   function providerCard(p,i){let runnable=p.runnable?'READY':'BRIDGE';return `<div class="provider-card"><div class="provider-icon">${p.iconUrl?`<img src="${esc(p.iconUrl)}">`:'🧩'}</div><div class="grow"><b>${esc(p.name||p.internalName)}</b><small>${esc((p.authors||[]).join(', '))} · v${esc(p.version||'?')} · ${esc((p.tvTypes||[]).join(', '))}</small><small>${esc(p.description||'')}</small></div><span class="status ${p.enabled!==false?'on':''}">${p.enabled!==false?runnable:'OFF'}</span><button class="btn ghost" data-toggle-provider="${i}">${p.enabled!==false?'Disable':'Enable'}</button></div>`}
   function settings(){return `<div class="hub"><div class="section-title"><h2>Settings & data</h2></div><div class="panel"><div class="switch"><div><b>Autoplay</b><small class="muted">Start compatible media automatically</small></div><input id="autoplay" type="checkbox" ${db.settings.autoplay?'checked':''}></div><div class="switch"><div><b>Parallel provider search</b><small class="muted">Search enabled providers concurrently through the bridge</small></div><input id="searchParallel" type="checkbox" ${db.settings.searchParallel?'checked':''}></div><div class="hub-actions"><button class="btn" id="exportData">Export data</button><button class="btn ghost" id="importData">Import data</button><button class="btn ghost danger" id="wipeData">Erase local data</button></div></div></div>`}
-  function render(){let h=$('hub');if(!h)return;nav();h.innerHTML=page==='home'?home():page==='library'?library():page==='history'?history():page==='extensions'?extensions():settings();bind()}
+  function render(){
+    let h=$('hub');
+    if(!h)return;
+    try{
+      const hasVideo=new URLSearchParams(location.search).has('url');
+      if(hasVideo){
+        $('open')?.classList.add('hidden');
+        $('view')?.classList.remove('hidden');
+        document.body.classList.add('player-mode');
+        return;
+      }
+      $('open')?.classList.remove('hidden');
+      $('view')?.classList.add('hidden');
+      document.body.classList.remove('player-mode');
+      nav();
+      h.innerHTML=page==='home'?home():page==='library'?library():page==='history'?history():page==='extensions'?extensions():settings();
+      bind();
+      document.body.classList.add('aiku-hub-ready');
+    }catch(e){
+      console.error('AikuStream UI error',e);
+      $('open')?.classList.remove('hidden');
+      h.innerHTML='<div class="hub"><div class="empty"><b>AikuStream UI failed to render.</b><br><small>'+esc(e?.message||'Unknown error')+'</small><br><button class="btn" id="recoverUi" style="margin-top:12px">Reset local app data</button></div></div>';
+      $('recoverUi')?.addEventListener('click',()=>{localStorage.removeItem(KEY);location.reload()});
+    }
+  }
   function bind(){
     document.querySelectorAll('#topnav button').forEach(b=>b.onclick=()=>go(b.dataset.page));document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));document.querySelectorAll('[data-open]').forEach(e=>e.onclick=()=>openItem(e.dataset.open,e.dataset.id));
-    $('addUrl')?.addEventListener('click',urlModal);$('addRepo')?.addEventListener('click',repoModal);$('clearHistory')?.addEventListener('click',()=>{if(confirm('Clear playback history?')){db.history=[];db.continue=[];save();render()}});
+    $('addUrl')?.addEventListener('click',urlModal);$('directUrlFab')?.addEventListener('click',urlModal);$('addRepo')?.addEventListener('click',repoModal);$('clearHistory')?.addEventListener('click',()=>{if(confirm('Clear playback history?')){db.history=[];db.continue=[];save();render()}});
     $('exportData')?.addEventListener('click',exportData);$('importData')?.addEventListener('click',importData);$('wipeData')?.addEventListener('click',()=>{if(confirm('Erase all AikuStream local data?')){localStorage.removeItem(KEY);db=load();render();toast('Local data erased')}});
     $('autoplay')?.addEventListener('change',e=>{db.settings.autoplay=e.target.checked;save()});$('searchParallel')?.addEventListener('change',e=>{db.settings.searchParallel=e.target.checked;save()});
     $('globalSearchFocus')?.addEventListener('click',searchModal);$('saveBridge')?.addEventListener('click',()=>{db.settings.bridgeUrl=norm($('bridgeUrl').value)||'';save();toast(db.settings.bridgeUrl?'Runtime saved':'Runtime cleared')});$('testBridge')?.addEventListener('click',testBridge);$('refreshAll')?.addEventListener('click',refreshAll);
@@ -67,5 +100,5 @@
   function name(u){try{return decodeURIComponent(new URL(u).pathname.split('/').filter(Boolean).pop()||'Video').replace(/[-_]/g,' ')}catch{return'Video'}}
   function exportData(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='aikustream-library-v3.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
   function importData(){let i=document.createElement('input');i.type='file';i.accept='.json,application/json';i.onchange=async()=>{try{let x=JSON.parse(await i.files[0].text());db={...defaults,...x,settings:{...defaults.settings,...(x.settings||{})}};save();render();toast('Library imported')}catch{toast('Invalid AikuStream data')}};i.click()}
-  render();
+  if(!new URLSearchParams(location.search).has('url')) render();
 })();
