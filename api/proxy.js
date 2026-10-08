@@ -28,7 +28,9 @@ export default async function handler(request) {
   const range = request.headers.get('range');
   if (range) headers.set('range', range);
   headers.set('accept', request.headers.get('accept') || '*/*');
-  headers.set('user-agent', request.headers.get('user-agent') || 'Mozilla/5.0 AikuPlayer/2.0');
+  headers.set('user-agent', request.headers.get('user-agent') || 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36 AikuPlayer/3.0');
+  headers.set('referer', target.origin + '/');
+  headers.set('origin', target.origin);
   headers.set('accept-encoding', 'identity');
 
   let upstream;
@@ -39,8 +41,15 @@ export default async function handler(request) {
   }
 
   const out = new Headers();
+  out.set('cache-control','no-store, no-transform');
   const copy = ['content-type','content-length','content-range','accept-ranges','cache-control','etag','last-modified','content-disposition'];
   for (const h of copy) { const v = upstream.headers.get(h); if (v) out.set(h, v); }
+  if (!out.get('content-type')) {
+    const path = target.pathname.toLowerCase();
+    const ext = path.split('.').pop();
+    const types = {mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime,mkv:'video/x-matroska',m4v:'video/x-m4v',m3u8:'application/vnd.apple.mpegurl',ts:'video/mp2t'};
+    if (types[ext]) out.set('content-type', types[ext]);
+  }
   out.set('access-control-allow-origin','*');
   out.set('access-control-expose-headers','Content-Length,Content-Range,Accept-Ranges,Content-Type,ETag,Last-Modified');
   out.set('cross-origin-resource-policy','cross-origin');
