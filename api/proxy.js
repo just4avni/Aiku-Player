@@ -47,7 +47,7 @@ export default async function handler(request) {
   if (!out.get('content-type')) {
     const path = target.pathname.toLowerCase();
     const ext = path.split('.').pop();
-    const types = {mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime,mkv:'video/x-matroska',m4v:'video/x-m4v',m3u8:'application/vnd.apple.mpegurl',ts:'video/mp2t'};
+    const types = {mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime',mkv:'video/x-matroska',m4v:'video/x-m4v',m3u8:'application/vnd.apple.mpegurl',ts:'video/mp2t',avi:'video/x-msvideo',flv:'video/x-flv',wmv:'video/x-ms-wmv',mpeg:'video/mpeg',mpg:'video/mpeg',ogv:'video/ogg',m2ts:'video/mp2t',mts:'video/mp2t',3gp:'video/3gpp',mkv:'video/x-matroska'};
     if (types[ext]) out.set('content-type', types[ext]);
   }
   out.set('access-control-allow-origin','*');
