@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#060606">
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="/manifest.webmanifest">
-<title>Player – 0adjs shop</title>
+<title>AikuStream</title>
 <style>
 :root{
   --bg:#060606;--surface:#0e0e0e;--surface-2:#141414;--line:#232323;--line-2:#331414;
@@ -114,26 +114,26 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
 .menu-list{display:flex;flex-direction:column;gap:3px}.menu-choice{display:flex;align-items:center;justify-content:space-between;width:100%;border:0;background:transparent;color:#eee;padding:10px 10px;border-radius:10px;font:600 13px var(--body);cursor:pointer;text-align:left}.menu-choice:hover{background:#ffffff10}.menu-choice.active{background:#f01818;color:#fff}.menu-choice small{color:#aaa}.menu-choice.active small{color:#fff}.mini-btn{border:1px solid #333;background:#181818;color:#eee;border-radius:9px;padding:8px 10px;font:600 12px var(--body);cursor:pointer}.panel-actions{display:flex;gap:7px;align-items:center}.subtitle-badge{position:absolute;left:50%;bottom:78px;transform:translateX(-50%);max-width:82%;padding:4px 10px;text-align:center;font-size:clamp(13px,2vw,18px);font-weight:600;line-height:1.35;text-shadow:0 2px 4px #000,0 1px 2px #000;color:#fff;pointer-events:none;z-index:5}.player.locked .controls,.player.locked .badge-live{display:none}.lock-indicator{position:absolute;top:12px;left:50%;transform:translateX(-50%);padding:6px 10px;border-radius:99px;background:#000b;color:#fff;font-size:11px;z-index:12;opacity:0;transition:.2s}.player.locked .lock-indicator{opacity:1}.gesture-hint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#000c;padding:9px 13px;border-radius:99px;font-size:12px;font-weight:700;opacity:0;pointer-events:none;z-index:12}.gesture-hint.show{animation:rp .8s ease-out}
 @media(max-width:560px){.subs-panel,.audio-panel,.chapters-panel{bottom:68px;right:7px}.subtitle-badge{bottom:62px}.panel-input{font-size:14px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* AikuStream media-center shell */
+.topnav{display:flex;gap:4px;align-items:center}.topnav button{border:0;background:transparent;color:#aaa;padding:9px 11px;border-radius:9px;font:600 12px var(--body);cursor:pointer}.topnav button:hover,.topnav button.active{background:#ffffff0c;color:#fff}.hub{width:min(1180px,94%);margin:0 auto;padding:24px 0 70px}.hub-search{display:flex;gap:10px;margin:10px 0 24px}.hub-search input{background:#101010}.hub-hero{padding:28px;border:1px solid #252525;border-radius:22px;background:radial-gradient(500px 220px at 80% 0,#f0181812,transparent 70%),linear-gradient(145deg,#151515,#0b0b0b);box-shadow:0 20px 70px #0008}.hub-hero h1{font-size:clamp(30px,6vw,52px);line-height:1;margin:0 0 8px}.hub-hero p{color:#999;max-width:720px;margin:0}.hub-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.page{display:none}.page.active{display:block}.section-title{display:flex;justify-content:space-between;align-items:center;margin:28px 0 12px}.section-title h2{font-size:18px;margin:0}.muted{color:#777;font-size:12px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}.tile{position:relative;min-width:0;border:1px solid #242424;background:#101010;border-radius:15px;overflow:hidden;cursor:pointer;transition:.15s}.tile:hover{transform:translateY(-2px);border-color:#3a3a3a}.tile-img{aspect-ratio:2/3;background:linear-gradient(145deg,#1d1d1d,#090909);display:grid;place-items:center;color:#555;font-size:26px}.tile-img img{width:100%;height:100%;object-fit:cover;display:block}.tile-body{padding:10px}.tile-title{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tile-sub{color:#777;font-size:11px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.progress-mini{height:3px;background:#292929}.progress-mini i{display:block;height:100%;background:var(--red)}.empty{padding:28px;border:1px dashed #2a2a2a;border-radius:15px;color:#777;text-align:center}.panel{padding:18px;border:1px solid #242424;border-radius:17px;background:#101010;margin-top:14px}.list{display:flex;flex-direction:column;gap:8px}.list-row{display:flex;align-items:center;gap:12px;padding:11px;border:1px solid #222;border-radius:12px;background:#0b0b0b}.list-row .grow{flex:1;min-width:0}.list-row b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.list-row small{color:#777}.danger{color:#ff7b7b!important}.pill{display:inline-flex;border:1px solid #303030;border-radius:99px;padding:4px 8px;color:#aaa;font-size:10px}.modal-back{position:fixed;inset:0;background:#000b;backdrop-filter:blur(8px);z-index:100;display:grid;place-items:center;padding:16px}.modal{width:min(620px,100%);max-height:90vh;overflow:auto;background:#111;border:1px solid #333;border-radius:20px;padding:20px;box-shadow:0 30px 100px #000}.modal h2{margin:0 0 6px}.modal p{color:#888;font-size:13px}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.repo-card{padding:15px;border:1px solid #262626;border-radius:14px;background:#0c0c0c}.repo-card b{font-size:14px}.repo-card small{display:block;color:#777;margin-top:4px}.repo-actions{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}.switch{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #222}.switch:last-child{border-bottom:0}.switch input{width:auto;flex:none}.toast2{position:fixed;left:50%;bottom:24px;transform:translate(-50%,15px);background:#151515;border:1px solid #333;padding:10px 15px;border-radius:99px;z-index:120;opacity:0;pointer-events:none;transition:.2s}.toast2.show{opacity:1;transform:translate(-50%,0)}
+.eyebrow{font-size:10px;letter-spacing:.16em;color:#777;font-weight:800}.count{font-size:11px;color:#777;margin-left:5px}.provider-strip{display:flex;gap:8px;overflow:auto;padding:2px 0 8px}.provider-chip{display:flex;align-items:center;gap:8px;flex:none;background:#101010;border:1px solid #292929;color:#ddd;border-radius:99px;padding:8px 12px}.provider-chip img{width:20px;height:20px;border-radius:6px;object-fit:cover}.bridge-panel{padding:18px;border:1px solid #303030;border-radius:18px;background:linear-gradient(145deg,#121212,#0b0b0b);margin-bottom:22px}.bridge-panel h3{margin:5px 0}.bridge-panel p{color:#999;font-size:13px;line-height:1.55}.bridge-row{display:flex;gap:8px;align-items:center;margin:12px 0}.bridge-row input{flex:1;min-width:0}.repo-head{display:flex;gap:12px;align-items:flex-start}.repo-head img,.provider-icon img{width:42px;height:42px;border-radius:10px;object-fit:cover}.provider-list{display:flex;flex-direction:column;gap:8px}.provider-card{display:flex;align-items:center;gap:12px;padding:13px;border:1px solid #252525;border-radius:15px;background:#0d0d0d}.provider-card small{display:block;color:#777;margin-top:3px;line-height:1.3}.provider-icon{width:42px;flex:none;display:grid;place-items:center;font-size:26px}.status{font-size:9px;border:1px solid #3a3a3a;padding:5px 7px;border-radius:99px;color:#888}.status.on{color:#9fef70;border-color:#35552c}.mono{font-family:ui-monospace,monospace;word-break:break-all}.search-results{margin-top:15px}.search-row{display:flex;align-items:center;gap:10px;padding:9px;border-bottom:1px solid #222}.search-row img{width:44px;height:60px;object-fit:cover;border-radius:7px}.search-row small,.source-btn small{display:block;color:#777;margin-top:3px}.source-list{display:grid;gap:8px;margin-top:12px}.source-btn{display:flex;justify-content:space-between;align-items:center;text-align:left;padding:12px;border:1px solid #2b2b2b;border-radius:12px;background:#0b0b0b;color:#eee}.detail{display:flex;gap:15px}.detail>img{width:130px;max-height:190px;object-fit:cover;border-radius:12px}@media(max-width:600px){.bridge-row{flex-wrap:wrap}.bridge-row input{flex-basis:100%}.provider-card{flex-wrap:wrap}.provider-card .status{margin-left:auto}.detail{flex-direction:column}.detail>img{width:100px;height:145px}}
+
+@media(max-width:760px){#appHeader{height:auto;min-height:60px;flex-wrap:wrap;padding:8px 4%;gap:5px}.topnav{width:100%;overflow:auto;order:3}.topnav button{white-space:nowrap}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hub{padding-top:14px}}
 </style>
 </head>
 <body>
-<header>
-  <a class="logo" href="?" style="text-decoration:none;color:inherit">0ADJS<span>PLAYER</span></a>
+<header id="appHeader">
+  <a class="logo" href="?" style="text-decoration:none;color:inherit">AIKU<span>STREAM</span></a>
+  <nav class="topnav" id="topnav">
+    <button data-page="home">Home</button><button data-page="library">My List</button><button data-page="history">History</button><button data-page="extensions">Extensions</button><button data-page="settings">Settings</button>
+  </nav>
 </header>
 
 <main>
-  <section id="open" class="card open hidden">
-    <h1>Play any video link</h1>
-    <p class="sub">Paste a direct video URL. Nothing is uploaded or stored.</p>
-    <form id="openForm">
-      <input id="urlIn" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://example.com/video.mp4" required>
-      <button class="btn">Play</button>
-    </form>
-    <div id="openErr" class="err" role="alert"></div>
-    <div class="chips"><b>MP4</b><b>WebM</b><b>HLS</b><b>Direct URLs</b><b>Google Drive*</b><b>Dropbox*</b></div>
-    <p class="note">*MKV and some codecs only play if your browser supports them. The link must be a direct file link, not a web page.</p>
+  <section id="open" class="hidden">
+    <div id="hub" class="hub"></div>
   </section>
-
   <section id="view" class="hidden">
     <div id="player" class="player">
       <div class="video-stage" id="stage"><video id="v" playsinline preload="metadata" referrerpolicy="no-referrer"></video></div>
@@ -519,8 +519,13 @@ video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
   if(!document.pictureInPictureEnabled)$('pip').classList.add('hidden');
   setIcons();
   applyZoom(1,'fit');
+  window.__aikuPlayerHook=function(item,db,save){
+    try{ $('title').textContent=new URLSearchParams(location.search).get('title')||item.title||fileName(item.url); }catch{}
+    v.addEventListener('timeupdate',()=>{ if(item){item.position=Number(v.currentTime)||0;item.duration=Number(v.duration)||item.duration||0; const i=db.history.findIndex(x=>x.id===item.id); const copy={...item,updated:Date.now()}; if(i>=0)db.history.splice(i,1); db.history.unshift(copy); const c=db.continue.findIndex(x=>x.id===item.id); if(c>=0)db.continue.splice(c,1); if(item.duration>0&&item.position<item.duration-15)db.continue.unshift({...copy}); if(db.continue.length>50)db.continue.length=50; if(db.history.length>100)db.history.length=100; save(); }});
+  };
   const src=new URLSearchParams(location.search).get('url'); if(src)start(src); else $('open').classList.remove('hidden');
 })();
 </script>
+<script src="app.js"></script>
 </body>
 </html>

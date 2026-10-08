@@ -1,24 +1,21 @@
-# Aiku Player v4
+# AikuStream
 
-Netflix-style browser video player for direct media URLs.
+A browser media center with a CloudStream-style repository/provider host and the Aiku player.
 
-## Features
-- MP4/WebM/native browser playback
-- HLS `.m3u8` via hls.js with quality and alternate audio tracks
-- Vercel streaming proxy fallback with Range requests
-- Play/pause, seek, 10s skip, volume, speed, fullscreen, PiP
-- Fit / Fill / 100–300% zoom, pinch zoom and pan
-- Subtitle/caption menu: HLS subtitle tracks, remote WebVTT URL, local `.vtt` file
-- Audio/language selector for HLS alternate audio tracks
-- Chapters menu when a chapters text track is supplied
-- Cinema mode, screen lock, resume position, keyboard shortcuts
-- Mobile double-tap seeking and center fullscreen gesture
+## CloudStream repositories
 
-## Deploy
-Deploy the `Aiku-Player` directory to Vercel as a static site. The `/api/proxy` function is used automatically when a direct media request fails.
+Paste any public CloudStream `repo.json` or `plugins.json` URL in **Extensions → Add repository**. AikuStream resolves `manifestVersion`, `pluginLists`, plugin metadata, icons, authors, versions, languages and tvTypes, and persists the repository/provider registry in browser localStorage.
 
-## Subtitle URL
-You can preload a WebVTT subtitle with:
-`?url=VIDEO_URL&sub=SUBTITLE_VTT_URL&subLabel=English`
+## Important `.cs3` limitation
 
-Remote subtitle files must allow browser access (CORS), or the browser will block them.
+CloudStream `.cs3` packages are compiled Android/Kotlin plugins. A normal browser cannot execute them directly. AikuStream therefore separates repository discovery from plugin execution. To make `.cs3` providers actually run, configure a compatible CloudStream runtime/bridge in **Extensions → CloudStream compatibility bridge**.
+
+See `CLOUDSTREAM-BRIDGE.md` for the exact HTTP contract.
+
+## Local data
+
+Favorites, history, continue-watching, repositories, provider state and settings are stored locally in the browser. Use Export/Import in Settings for backup.
+
+## Player
+
+The existing Aiku player remains responsible for HLS, subtitles, audio tracks, chapters, zoom, fullscreen, PiP, range/proxy loading and browser FFmpeg compatibility conversion.
