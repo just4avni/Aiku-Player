@@ -1,1 +1,8 @@
-{"name":"AikuStream","short_name":"AikuStream","start_url":"/","display":"standalone","background_color":"#060606","theme_color":"#060606","description":"A local-first browser media center and video player."}
+{
+  "name": "Aiku Player",
+  "short_name": "Aiku",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#060606",
+  "theme_color": "#060606"
+}
